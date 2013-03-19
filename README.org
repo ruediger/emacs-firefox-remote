@@ -1,0 +1,31 @@
+# -*- mode:org; mode:auto-fill; fill-column:80; coding:utf-8; -*-
+* Configuring Firefox
+Go to =about:config= and set the following paramters:
+=devtools.debugger.remote-enabled= to =true= and =devtools.debugger.force-local=
+to =false= and =devtools.chrome.enabled= to =true= and restarted firefox.
+
+Open a Scratchpad (Shift+F4 or WebDeveloper menu entry) and select in the
+Environment menu the "Browser" option.  Copy and paste the following script and
+eval it with C-r.
+
+https://developer.mozilla.org/en-US/docs/Tools/Scratchpad#Using_Scratchpad_to_access_Firefox_internals
+https://bugzilla.mozilla.org/show_bug.cgi?id=836410#c0
+
+#+BEGIN_SRC javascript
+const Cu = Components.utils;
+
+Cu.import("resource://gre/modules/devtools/dbg-server.jsm");
+
+function startDebuggerServer()
+{
+  // Start the server.
+  if (!DebuggerServer.initialized) {
+    DebuggerServer.init();
+    DebuggerServer.addBrowserActors();
+  }
+  // For an nsIServerSocket we do this:
+  DebuggerServer.openListener(6000); // A connection on port 6000.
+}
+ 
+startDebuggerServer();
+#+END_SRC
