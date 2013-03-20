@@ -29,6 +29,8 @@
 
 (require 'json)
 
+;;; Low Level Connection Handling
+
 (defvar firefox-remote-buffer-name "*FirefoxRemote*"
   "Name for process buffer.")
 
@@ -87,6 +89,38 @@ CALLBACK gets called with the parsed JSON object."
           (append firefox-remote--callbacks (list callback))))
   (let ((json-data (json-encode msg)))
    (process-send-string con (format "%s:%s" (length json-data) json-data))))
+
+;;;
+
+(defun firefox-remote-get-list-of-tabs (con callback)
+  "Ask CON for a list of tabs.
+CALLBACK gets called with an array of tabs."
+  (firefox-remote-send
+   con '((to . root) (type . listTabs))
+   (lambda (data)
+     (let ((cb callback))
+       (let ((selected (cdr (assq 'selected data))))
+         (push '(selected . t) (aref (cdr (assq 'tabs foo)) selected))
+         (funcall callback (cdr (assq 'tabs foo))))))))
+
+;;;
+
+(defun firefox-remote-get-stylesheets (con tab callback)
+  (if (or (not tab) (eq tab 'selected))
+    (firefox-remote-send ;; Use selected tab
+     con '((to . root) (type . listTabs))
+     (lambda (data)
+       (let ((con con) (cb callback))
+        (funcall #'firefox-remote-get-stylesheets
+                 con
+                 (aref (cdr (assq 'tabs data))
+                       (cdr (assq 'selected data)))
+                 cb))))
+    (let ((actor (cdr (assq 'styleEditorActor tab))))
+      (firefox-remote-send
+       con `((to . ,actor)
+             (type . getStyleSheets))
+       callback))))
 
 (provide 'firefox-remote)
 
