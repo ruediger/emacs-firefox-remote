@@ -49,15 +49,17 @@
     (goto-char firefox-remote--last-json-point)
     (when (looking-at "[[:digit:]]+:")
       (goto-char (match-end 0)))
-    (let ((obj (json-read)))
-      (setq firefox-remote--last-json-point (point))
-      (funcall (pop firefox-remote--callbacks) obj))))
+    (let ((obj (ignore-errors (json-read))))
+      (when obj
+        (insert "\n")
+        (setq firefox-remote--last-json-point (point))
+        (funcall (pop firefox-remote--callbacks) obj)))))
 
 (defun firefox-remote--handle-init (obj)
   (message "Init %s" obj))
 
 (defun firefox-remote-connect (host service)
-  "Connect to FIREFOX on HOST with SERVICE."
+  "Connect to Firefox on HOST with SERVICE."
   (let ((proc (make-network-process :name "firefox-remote"
                                     :buffer firefox-remote-buffer-name
                                     :host host
