@@ -94,30 +94,42 @@ to set it.")
 (defun firefox-remote--sentinel (proc change)
   (message "ff--sentinel %s: %s" proc change))
 
+(defun firefox-remote--handle-json-object (proc)
+  "Read the JSON object from the buffer and call the matching callback.
+The JSON objects are received in the following form:
+
+    <size>:<json object>
+
+PROC is the firefox remote process."
+  (goto-char firefox-remote--last-json-point)
+  (when (looking-at "[[:digit:]]+:")
+    (goto-char (match-end 0)))
+  (let ((obj (ignore-errors (json-read))))
+    (when obj
+      (insert "\n")
+      (setq firefox-remote--last-json-point (point))
+      (let ((callback (or
+                       (pop firefox-remote--callbacks)
+                       (cond
+                        ((assq 'type obj) (firefox-remote-get-handler
+                                           proc
+                                           (cdr (assq 'type obj))))
+                        ((assq 'error obj) (firefox-remote-get-error-handler
+                                            proc
+                                            (cdr (assq 'error obj)))))
+                       (firefox-remote-get-default-handler proc))))
+        (when callback
+          (funcall callback obj))))))
+
 (defun firefox-remote--filter (proc data)
+  "Insert DATA into PROC's buffer and handle the json objects."
   (with-current-buffer (process-buffer proc)
     (save-excursion
       (goto-char (point-max))
       (insert data))
     (goto-char firefox-remote--last-json-point)
-    (when (looking-at "[[:digit:]]+:")
-      (goto-char (match-end 0)))
-    (let ((obj (ignore-errors (json-read))))
-      (when obj
-        (insert "\n")
-        (setq firefox-remote--last-json-point (point))
-        (let ((callback (or
-                         (pop firefox-remote--callbacks)
-                         (cond
-                          ((assq 'type obj) (firefox-remote-get-handler
-                                             proc
-                                             (cdr (assq 'type obj))))
-                          ((assq 'error obj) (firefox-remote-get-error-handler
-                                              proc
-                                              (cdr (assq 'error obj)))))
-                         (firefox-remote-get-default-handler proc))))
-          (when callback
-            (funcall callback obj)))))))
+    (while (/= (point) (point-max))     ; read until all objects are handled
+      (firefox-remote--handle-json-object proc))))
 
 (defun firefox-remote--handle-init (obj)
   (message "Init %s" obj))
@@ -194,4 +206,4 @@ CALLBACK gets called with an array of tabs."
 
 (provide 'firefox-remote)
 
-;; firefox-remote.el ends here
+;;; firefox-remote.el ends here
