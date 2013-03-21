@@ -21,7 +21,7 @@
     (setq ~con nil))
 
   (setq ~con (firefox-remote-connect "localhost" 6000))
-  (firefox-remote-set-default-handler #'~background-handler))
+  (firefox-remote-set-default-handler ~con #'~background-handler))
 
 ;; Set ~tab to selected tab
 (firefox-remote-send ~con '((to . root) (type . listTabs))
