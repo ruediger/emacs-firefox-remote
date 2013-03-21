@@ -1,4 +1,12 @@
 # -*- mode:org; mode:auto-fill; fill-column:80; coding:utf-8; -*-
+Since version 15 [[http://www.mozilla.org/firefox][Mozilla Firefox]] comes with a remote debugging protocol.  This
+was introduced to support debugging for Firefox on Android and FirefoxOS.  But
+it can also be activated for regular Firefox although it requires a bit of
+extra work at the moment (Firefox 19).
+
+This Emacs package provides a basic implementation of the protocol for Emacs.
+So far only the lowlevel communication structure is done.
+
 * Configuring Firefox
 Go to =about:config= and set the following paramters:
 =devtools.debugger.remote-enabled= to =true= and =devtools.debugger.force-local=
@@ -8,8 +16,8 @@ Open a Scratchpad (Shift+F4 or WebDeveloper menu entry) and select in the
 Environment menu the "Browser" option.  Copy and paste the following script and
 eval it with C-r.
 
-https://developer.mozilla.org/en-US/docs/Tools/Scratchpad#Using_Scratchpad_to_access_Firefox_internals
-https://bugzilla.mozilla.org/show_bug.cgi?id=836410#c0
+- https://developer.mozilla.org/en-US/docs/Tools/Scratchpad#Using_Scratchpad_to_access_Firefox_internals
+- https://bugzilla.mozilla.org/show_bug.cgi?id=836410#c0
 
 #+BEGIN_SRC javascript
 const Cu = Components.utils;
@@ -29,3 +37,28 @@ function startDebuggerServer()
  
 startDebuggerServer();
 #+END_SRC
+
+* Information
+
+- https://wiki.mozilla.org/Remote_Debugging_Protocol
+- https://wiki.mozilla.org/DevTools/Features/Debugger/Notes
+- https://github.com/paulrouget/firefox-remote-styleEditors
+
+* Basic Usage
+
+#+BEGIN_SRC emacs-lisp
+(let ((con (firefox-remote-connect "localhost" 6000)))
+  (firefox-remote-send con '((to . root) (type . listTabs))
+                       (lambda (data)
+                         (let* ((selected (cdr (assq 'selected data)))
+                                (tabs (cdr (assq 'tabs data)))
+                                (current-tab (aref tabs selected))
+                                (url (cdr (assq 'url current-tab)))
+                                (title (cdr (assq 'title current-tab))))
+                           (message "Current Tab \"%s\": \"%s\"" title url))))
+  (sleep-for 10)
+  (firefox-remote-disconnect con))
+#+END_SRC
+
+This should print the title and url of the currently selected tab to the
+=*Messages*= buffer.
