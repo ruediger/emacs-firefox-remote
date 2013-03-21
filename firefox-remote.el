@@ -31,6 +31,57 @@
 
 ;;; Low Level Connection Handling
 
+(defvar firefox-remote--handler-alist nil
+  "Alist mapping message types to handlers.  This should be process local.
+Use `firefox-remote-set-handler' to manipulate it.")
+
+(defun firefox-remote-set-handler (connection type handler)
+  "Set HANDLER for message TYPE on CONNECTION."
+  (with-current-buffer (process-buffer connection)
+    (let ((oldhandler (assq type firefox-remote--handler-alist)))
+      (if oldhandler
+          (setcdr oldhandler handler)
+        (setq firefox-remote--handler-alist
+              (cons (cons type handler) firefox-remote--handler-alist))))))
+
+(defun firefox-remote-get-handler (connection type)
+  "Get handler for message TYPE on CONNECTION."
+  (with-current-buffer (process-buffer connection)
+    (cdr (assq type firefox-remote--handler-alist))))
+
+(defvar firefox-remote--error-handler-alist nil
+  "Alist mapping errpr types to handlers.  This should be process local.
+Use `firefox-remote-set-error-handler' to manipulate it.")
+
+(defun firefox-remote-set-error-handler (connection type handler)
+  "Set HANDLER for error TYPE on CONNECTION."
+  (with-current-buffer (process-buffer connection)
+    (let ((oldhandler (assq type firefox-remote--error-handler-alist)))
+      (if oldhandler
+          (setcdr oldhandler handler)
+        (setq firefox-remote--error-handler-alist
+              (cons (cons type handler) firefox-remote--error-handler-alist))))))
+
+(defun firefox-remote-get-error-handler (connection type)
+  "Get handler for error TYPE on CONNECTION."
+  (with-current-buffer (process-buffer connection)
+    (cdr (assq type firefox-remote--error-handler-alist))))
+
+(defvar firefox-remote--default-handler nil
+  "Handler called if no other handler is found and message is not a reply.
+This should be process local.  Use `firefox-remote-set-default-handler'
+to set it.")
+
+(defun firefox-remote-set-default-handler (connection handler)
+  "Set default HANDLER for CONNECTION."
+  (with-current-buffer (process-buffer connection)
+    (setq firefox-remote--default-handler handler)))
+
+(defun firefox-remote-get-default-handler (connection)
+  "Get default handler for CONNECTION."
+  (with-current-buffer (process-buffer connection)
+    firefox-remote--default-handler))
+
 (defvar firefox-remote-buffer-name "*FirefoxRemote*"
   "Name for process buffer.")
 
@@ -41,7 +92,7 @@
   "Read next JSON object from here.  This should be process local.")
 
 (defun firefox-remote--sentinel (proc change)
-  (message "ff--sentinel %s %s" proc change))
+  (message "ff--sentinel %s: %s" proc change))
 
 (defun firefox-remote--filter (proc data)
   (with-current-buffer (process-buffer proc)
@@ -55,7 +106,18 @@
       (when obj
         (insert "\n")
         (setq firefox-remote--last-json-point (point))
-        (funcall (pop firefox-remote--callbacks) obj)))))
+        (let ((callback (or
+                         (pop firefox-remote--callbacks)
+                         (cond
+                          ((assq 'type obj) (firefox-remote-get-handler
+                                             proc
+                                             (cdr (assq 'type obj))))
+                          ((assq 'error obj) (firefox-remote-get-error-handler
+                                              proc
+                                              (cdr (assq 'error obj)))))
+                         (firefox-remote-get-default-handler proc))))
+          (when callback
+            (funcall callback obj)))))))
 
 (defun firefox-remote--handle-init (obj)
   (message "Init %s" obj))
@@ -72,10 +134,14 @@
                                     )))
     (with-current-buffer (process-buffer proc)
       (set (make-local-variable 'firefox-remote--callbacks) '(firefox-remote--handle-init))
-      (set (make-local-variable 'firefox-remote--last-json-point) (point-min)))
+      (set (make-local-variable 'firefox-remote--last-json-point) (point-min))
+      (set (make-local-variable 'firefox-remote--handler-alist) nil)
+      (set (make-local-variable 'firefox-remote--error-handler-alist) nil)
+      (set (make-local-variable 'firefox-remote--default-handler) nil))
     proc))
 
 (defun firefox-remote-disconnect (con)
+  "Disconnect firefox remote connection CON."
   (with-current-buffer (process-buffer con)
     (delete-process con)
     (kill-buffer)))
@@ -101,7 +167,7 @@ CALLBACK gets called with an array of tabs."
      (let ((cb callback))
        (let ((selected (cdr (assq 'selected data))))
          (push '(selected . t) (aref (cdr (assq 'tabs foo)) selected))
-         (funcall callback (cdr (assq 'tabs foo))))))))
+         (funcall cb (cdr (assq 'tabs foo))))))))
 
 ;;;
 
@@ -121,6 +187,10 @@ CALLBACK gets called with an array of tabs."
        con `((to . ,actor)
              (type . getStyleSheets))
        callback))))
+
+(defun firefox-remote--get-selected (tabs)
+  (aref (cdr (assq 'tabs tabs))
+        (cdr (assq 'selected tabs))))
 
 (provide 'firefox-remote)
 
