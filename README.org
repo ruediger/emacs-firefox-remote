@@ -1,4 +1,10 @@
 # -*- mode:org; mode:auto-fill; fill-column:80; coding:utf-8; -*-
+
+I just found out that a similar project which also includes Chrome support
+exists: https://github.com/segv/jss
+
+----
+
 Since version 15 [[http://www.mozilla.org/firefox][Mozilla Firefox]] comes with a remote debugging protocol.  This
 was introduced to support debugging for Firefox on Android and FirefoxOS.  But
 it can also be activated for regular Firefox although it requires a bit of
