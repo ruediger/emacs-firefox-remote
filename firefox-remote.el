@@ -1,4 +1,4 @@
-;;; firefox-remote --- Support for Firefox' remote debugging protocol ;; -*- lexical-binding: t -*-
+;;; firefox-remote.el --- Support for Firefox' remote debugging protocol ;; -*- lexical-binding: t -*-
 
 ;; Copyright (C) 2013 Rüdiger Sonderfeld
 
